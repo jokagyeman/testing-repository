@@ -1,23 +1,31 @@
 ---
 title: "First Markdown File"
 author: "Jonathan Agyeman"
-date: "January 15, 2019"
-output: html_document
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+# R Markdown
 
 This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
+## Generating ouput
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ```{r cars}
 summary(cars)
 ```
+
+The mean value for the spead and  ~~distant~~ distance can be summarize in the table below;
+
+Variable  | Mean    
+--------- | -----
+Speed     | 15.40
+Distance  | 42.98
 
 ## Including Plots
 
