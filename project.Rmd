@@ -1,0 +1,263 @@
+---
+title: "Final_Project"
+author: "Jonathan Agyeman"
+date: "April 22, 2019"
+output: github_document
+---
+
+```{r, message=FALSE}
+library("rjags")
+library("tidyverse")
+```
+
+
+#####Bayesian Analysis with Uninformative Priors 
+
+```{r}
+reg_model =
+	"model{ 
+
+		for(i in 1:length(n)){
+                 
+                 ##likelihood
+	         y[i] ~ dnorm(mu[i], inv.var)
+                 
+
+		 ###model
+                 mu[i] <- beta_0 + beta_1*possession[i] + beta_2*passes[i] + 
+			  beta_3*shot.accuracy[i] + beta_4*corners[i]+ beta_5*oppnt_poss[i]+beta_6*oppnt_pass[i] + beta_7*oppnt_shot.accuracy[i] + beta_8*oppnt_corners[i]
+		} 
+	
+		beta_0 ~ dnorm(0, 0.2)
+                beta_1 ~ dunif(0, 1)
+              	beta_2 ~ dpois(400)
+                beta_3 ~ dunif(0,1)
+              	beta_4 ~ dpois(4)
+		beta_5 ~ dunif(0, 1)
+		beta_6 ~ dpois(400)
+		beta_7 ~ dunif(0, 1)
+		beta_8 ~ dpois(4)
+		inv.var ~ dgamma(0.1,0.1)
+		sigma <- 1/sqrt(inv.var)
+	        
+}"
+
+```
+
+```{r , message = FALSE}
+##Read manchesterunited data
+manu <- read.csv("data.csv", header = TRUE)
+
+my.seed <-123
+set.seed(my.seed) 
+
+inits <- list(.RNG.name = "base::Mersenne-Twister",
+	      .RNG.seed = my.seed)
+ 
+jags.m1 <- jags.model( textConnection(reg_model), data = list( ###Put in data
+	'n' = manu$Game.number,
+	'y' = manu$Win.margin,
+	'possession' = manu$possession,
+	'passes' = manu$passes,
+	'shot.accuracy' =manu$shot.accuracy,
+	'corners' = manu$corners,
+	'oppnt_poss' = manu$oppnt_poss,
+	'oppnt_pass' = manu$oppnt_pass,
+	'oppnt_shot.accuracy' =manu$oppnt_shot.accuracy,
+	'oppnt_corners' = manu$oppnt_corners),
+	inits = inits)
+
+samps <- coda.samples(jags.m1, c("beta_0","beta_1", "beta_2","beta_3",
+				 "beta_4","beta_5", "beta_6", "beta_7",
+				 "beta_8", "sigma"), n.iter = 10000)
+
+
+summary(samps)
+```
+
+
+```{r}
+##credible intervals 
+print(HPDinterval(samps))
+```
+
+```{r}
+##traceplots
+par(mar =rep(2,4))
+plot(samps)
+```
+
+
+
+
+
+```{r}
+####Scaling data
+
+poss_manu = (manu$possession - mean(manu$possession))/sd(manu$possession) 
+pass_manu = (manu$passes - mean(manu$passes))/sd(manu$passes)
+shot_acc_manu = (manu$shot.accuracy - mean(manu$shot.accuracy))/sd(manu$shot.accuracy)
+corn_manu = (manu$corners - mean(manu$corners))/sd(manu$corners)
+opp_poss_manu = (manu$oppnt_poss - mean(manu$oppnt_poss))/sd(manu$oppnt_poss)
+opp_pass_manu = (manu$oppnt_pass - mean(manu$oppnt_pass))/sd(manu$oppnt_pass)
+opp_shot_acc_manu =(manu$oppnt_shot.accuracy - 	mean(manu$oppnt_shot.accuracy))/sd(manu$oppnt_shot.accuracy)
+oppnt_corn_manu =(manu$oppnt_corners-mean(manu$oppnt_corners))/sd(manu$oppnt_corners)
+
+```
+
+
+```{r}
+
+###Combining scaled data
+new_data <- cbind(manu, poss_manu, pass_manu, shot_acc_manu, corn_manu,
+		  opp_poss_manu, opp_pass_manu, opp_shot_acc_manu,
+		  oppnt_corn_manu)
+#View(new_data)
+```
+
+
+#####Regression model with informative priors
+```{r}
+reg_model1 =
+	"model{ 
+
+		for(i in 1:length(n)){
+                 
+                 ##likelihood
+	         y[i] ~ dnorm(mu[i], inv.var)
+                 
+
+		 ###model
+   		mu[i] <- beta_0 + beta_1*possession[i] + beta_2*passes[i] + 
+			  beta_3*shot.accuracy[i] + beta_4*corners[i]+ 						beta_5*oppnt_poss[i]+beta_6*oppnt_pass[i] + beta_7*oppnt_shot.accuracy[i] + beta_8*oppnt_corners[i]
+		} 
+	
+		beta_0 ~ dnorm(0, 0.2)
+                beta_1 ~ dnorm(0, 0.1)
+              	beta_2 ~ dnorm(0, 0.1)
+                beta_3 ~ dnorm(0, 0.1)
+              	beta_4 ~ dnorm(0, 0.1)
+		beta_5 ~ dnorm(0, 0.1)
+		beta_6 ~ dnorm(0, 0.1)
+		beta_7 ~ dnorm(0, 0.1)
+		beta_8 ~ dnorm(0, 0.1)
+		inv.var ~ dgamma(0.1,0.1)
+		sigma <- 1/sqrt(inv.var)
+
+
+
+		###Prediction
+                for(i in 1: length(nn)){
+                Predicted_margin[i] <-  beta_0 + beta_1*posses1[i] + beta_2*passes1[i] 			+ beta_3*shot.accuracy1[i] + beta_4*corners1[i]+ 		
+				beta_5*oppnt_poss1[i]+beta_6*oppnt_pass1[i] + 
+				beta_7*oppnt_shot.accuracy1[i] + 							beta_8*oppnt_corners1[i]
+}
+
+
+
+	        
+}"
+
+```
+
+```{r , message = FALSE}
+##Read manchesterunited data
+
+##Subset training data
+new_sub <- new_data[c(1:114),]
+
+##Subset test data
+new_predict <- new_data[c(115:152),]
+
+my.seed <-123
+set.seed(my.seed) 
+
+inits <- list(.RNG.name = "base::Mersenne-Twister",
+	      .RNG.seed = my.seed)
+ 
+jags.m1 <- jags.model( textConnection(reg_model1), data = list( ###Put in data
+	'n' = new_sub$Game.number,
+	'y' = new_sub$Win.margin,
+	'possession' = new_sub$poss_manu,
+	'passes' = new_sub$pass_manu,
+	'shot.accuracy' =new_sub$shot_acc_manu,
+	'corners' = new_sub$corn_manu,
+	'oppnt_poss' = new_sub$opp_poss_manu,
+	'oppnt_pass' = new_sub$opp_pass_manu,
+	'oppnt_shot.accuracy' =new_sub$opp_shot_acc_manu,
+	'oppnt_corners' = new_sub$oppnt_corn_manu,
+	'nn' = new_predict$Game.number,
+	'posses1' = new_predict$poss_manu,
+	'passes1' = new_predict$pass_manu,
+	'shot.accuracy1' =new_predict$shot_acc_manu,
+	'corners1' = new_predict$corn_manu,
+	'oppnt_poss1' = new_predict$opp_poss_manu,
+	'oppnt_pass1' = new_predict$opp_pass_manu,
+	'oppnt_shot.accuracy1' =new_predict$opp_shot_acc_manu,
+	'oppnt_corners1' = new_predict$oppnt_corn_manu),
+	inits = inits)
+
+
+samps1 <- coda.samples(jags.m1, c("beta_0","beta_1", "beta_2","beta_3",
+				 "beta_4","beta_5", "beta_6", "beta_7","beta_8",
+				 "sigma"), n.iter = 10000)
+
+preds <- coda.samples(jags.m1,c("Predicted_margin"), n.iter = 10000)
+
+summary(samps1)
+summary(preds)
+```
+
+
+```{r}
+##Credible intervals
+print(HPDinterval(samps1))
+```
+
+
+
+```{r}
+##trace plots
+par(mar =rep(2,4))
+plot(samps1)
+```
+
+
+
+```{r}
+sampPred <- preds[[1]][,9]
+plot(density(sampPred) , xlab = "", main  = "Predictive Posterior Distribution for\n Manchster United Win margin vrs Liverpool")
+abline(v = 1, col = "red")
+```
+
+
+```{r}
+sampPred1 <- preds[[1]][,10]
+plot(density(sampPred1) , xlab = "", main  = "Predictive Posterior Distribution for\n Manchster United Win margin vrs Crystal Palace")
+abline(v = 1, col = "red")
+```
+
+
+```{r}
+sampPred2 <- preds[[1]][,13]
+plot(density(sampPred2) , xlab = "", main  = "Predictive Posterior Distribution for\n Manchster United Win margin vrs Huddersfield")
+abline(v = 2, col = "red")
+
+```
+
+
+```{r}
+###linear regression frequentist
+
+fit1 <- lm(Win.margin ~ poss_manu + pass_manu + shot_acc_manu + corn_manu+
+	   	opp_poss_manu+ opp_pass_manu + opp_shot_acc_manu + oppnt_corn_manu,
+	            data = new_sub)
+
+summary(fit1)
+
+
+predicted <- predict(fit1, new_predict)
+
+predicted
+```
+
